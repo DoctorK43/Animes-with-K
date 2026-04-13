@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AnimeVault</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #0a0a0a, #111);
+  color: white;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  backdrop-filter: blur(10px);
+  background: rgba(255,255,255,0.05);
+  position: sticky;
+  top: 0;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 2px;
+}
+
+.search {
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+}
+
+/* FILTERS */
+.filters {
+  text-align: center;
+  margin: 10px;
+}
+
+.filters button {
+  background: rgba(255,255,255,0.1);
+  margin: 5px;
+  border-radius: 20px;
+}
+
+/* GALLERY */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 15px;
+  padding: 15px;
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 15px;
+}
+
+.card img {
+  width: 100%;
+  transition: 0.4s;
+}
+
+.card:hover img {
+  transform: scale(1.1);
+}
+
+/* LIKE */
+.like {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.6);
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+/* MODAL */
+.modal {
+  display: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.95);
+  text-align: center;
+}
+
+.modal img {
+  max-width: 90%;
+  margin-top: 40px;
+}
+
+#close {
+  position: absolute;
+  top: 20px;
+  right: 40px;
+  font-size: 30px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">AnimeVault</div>
+  <input class="search" id="search" placeholder="Search...">
+  <button onclick="login()">Admin</button>
+</header>
+
+<div class="filters">
+  <button onclick="setFilter('all')">All</button>
+  <button onclick="setFilter('vinland')">Vinland</button>
+</div>
+
+<div class="gallery" id="gallery"></div>
+
+<div class="modal" id="modal">
+  <span id="close">&times;</span>
+  <img id="modalImg">
+  <br>
+  <a id="downloadBtn" download>
+    <button>Download</button>
+  </a>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+<script>
+// FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID",
+  storageBucket: "YOUR_BUCKET",
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+const OWNER_EMAIL = "kartikeyrathour991@gmail.com";
+
+const gallery = document.getElementById("gallery");
+const search = document.getElementById("search");
+
+let filter = "all";
+
+// YOUR WALLPAPERS
+const wallpapers = [
+  {src:"vinland1.jpg", category:"vinland"},
+  {src:"vinland2.jpg", category:"vinland"},
+  {src:"vinland3.jpg", category:"vinland"},
+  {src:"vinland4.jpg", category:"vinland"},
+  {src:"vinland5.jpg", category:"vinland"}
+];
+
+// LOAD
+async function loadWallpapers() {
+  gallery.innerHTML = "";
+
+  wallpapers.forEach(w => {
+    if ((filter === "all" || w.category === filter) &&
+        w.src.toLowerCase().includes(search.value.toLowerCase())) {
+      createCard(w.src);
+    }
+  });
+
+  try {
+    const snap = await db.collection("wallpapers").get();
+    snap.forEach(doc => createCard(doc.data().url));
+  } catch(e){}
+}
+
+// CARD
+function createCard(src) {
+  const div = document.createElement("div");
+  div.className = "card";
+
+  div.innerHTML = `
+    <img src="${src}" onclick="openModal('${src}')">
+    <div class="like" onclick="like(event,'${src}')">❤️</div>
+  `;
+
+  gallery.appendChild(div);
+}
+
+// LIKE SYSTEM
+function like(e, src) {
+  e.stopPropagation();
+  let liked = JSON.parse(localStorage.getItem("likes") || "[]");
+
+  if (!liked.includes(src)) {
+    liked.push(src);
+    alert("Liked ❤️");
+  }
+
+  localStorage.setItem("likes", JSON.stringify(liked));
+}
+
+// FILTER
+function setFilter(f) {
+  filter = f;
+  loadWallpapers();
+}
+
+// SEARCH
+search.addEventListener("input", loadWallpapers);
+
+// LOGIN
+function login() {
+  const email = prompt("Email:");
+  const pass = prompt("Password:");
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(user => {
+      if (user.user.email === OWNER_EMAIL) {
+        showUpload();
+      }
+    });
+}
+
+// UPLOAD
+function showUpload() {
+  const btn = document.createElement("button");
+  btn.innerText = "Upload";
+  btn.onclick = uploadWallpaper;
+  document.body.prepend(btn);
+}
+
+function uploadWallpaper() {
+  const input = document.createElement("input");
+  input.type = "file";
+
+  input.onchange = async () => {
+    const file = input.files[0];
+    const ref = storage.ref("wallpapers/" + file.name);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+
+    await db.collection("wallpapers").add({url:url});
+    loadWallpapers();
+  };
+
+  input.click();
+}
+
+// MODAL
+const modal = document.getElementById("modal");
+const modalImg = document.getElementById("modalImg");
+const downloadBtn = document.getElementById("downloadBtn");
+
+function openModal(src) {
+  modal.style.display = "block";
+  modalImg.src = src;
+  downloadBtn.href = src;
+}
+
+document.getElementById("close").onclick = () => {
+  modal.style.display = "none";
+};
+
+loadWallpapers();
+</script>
+
+</body>
+</html>
