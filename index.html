@@ -6,68 +6,52 @@
 <title>AnimeVault</title>
 
 <style>
-* { box-sizing: border-box; }
-
 body {
   margin: 0;
-  font-family: -apple-system, sans-serif;
+  font-family: sans-serif;
   background: #0a0a0a;
   color: white;
 }
 
 /* HEADER */
 header {
-  position: sticky;
-  top: 0;
   display: flex;
   gap: 10px;
-  align-items: center;
   padding: 10px;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(10px);
+  background: #111;
 }
 
-.logo {
-  font-weight: bold;
-}
-
-.search {
+input {
   flex: 1;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   border: none;
 }
 
-/* GALLERY */
+/* GRID */
 .gallery {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  padding: 6px;
+  grid-template-columns: repeat(2,1fr);
+  gap: 5px;
+  padding: 5px;
 }
 
 @media(min-width:600px){
   .gallery { grid-template-columns: repeat(3,1fr); }
 }
 
-.card {
-  position: relative;
-}
-
-.card img {
+.gallery img {
   width: 100%;
-  border-radius: 8px;
   display: block;
+  border-radius: 8px;
 }
 
 /* MODAL */
 .modal {
   display: none;
   position: fixed;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   background: black;
-  z-index: 1000;
 }
 
 .modal img {
@@ -76,25 +60,25 @@ header {
 
 #close {
   position: absolute;
-  top: 15px;
-  right: 20px;
+  top: 10px;
+  right: 15px;
   font-size: 25px;
+  color: white;
 }
 
-/* BUTTON */
+button {
+  padding: 10px;
+  background: crimson;
+  border: none;
+  color: white;
+  border-radius: 10px;
+}
+
 .actions {
   position: fixed;
   bottom: 20px;
   width: 100%;
   text-align: center;
-}
-
-button {
-  padding: 10px 20px;
-  border: none;
-  background: crimson;
-  color: white;
-  border-radius: 20px;
 }
 </style>
 </head>
@@ -102,19 +86,18 @@ button {
 <body>
 
 <header>
-  <div class="logo">AnimeVault</div>
-  <input id="search" class="search" placeholder="Search...">
+  <b>AnimeVault</b>
+  <input id="search" placeholder="Search...">
   <button onclick="login()">⚙️</button>
 </header>
 
 <div class="gallery" id="gallery"></div>
 
-<!-- MODAL -->
 <div class="modal" id="modal">
   <span id="close">✕</span>
   <img id="modalImg">
   <div class="actions">
-    <button id="downloadBtn">Download</button>
+    <button onclick="downloadImage()">Download</button>
   </div>
 </div>
 
@@ -125,7 +108,7 @@ button {
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
 <script>
-// 🔥 PASTE YOUR FIREBASE CONFIG
+// 🔥 ADD YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "YOUR_KEY",
   authDomain: "YOUR_DOMAIN",
@@ -144,39 +127,47 @@ const OWNER_EMAIL = "kartikeyrathour991@gmail.com";
 const gallery = document.getElementById("gallery");
 const search = document.getElementById("search");
 
-// LOCAL IMAGES
+let currentImage = "";
+
+// 🔥 LOCAL IMAGES (SAFE PATH)
 const wallpapers = [
-  "vinland1.jpg",
-  "vinland2.jpg",
-  "vinland3.jpg",
-  "vinland4.jpg",
-  "vinland5.jpg"
+  "./vinland1.jpg",
+  "./vinland2.jpg",
+  "./vinland3.jpg",
+  "./vinland4.jpg",
+  "./vinland5.jpg"
 ];
 
-// LOAD IMAGES
+// LOAD
 async function loadWallpapers() {
   gallery.innerHTML = "";
 
   wallpapers.forEach(src => {
     if (src.toLowerCase().includes(search.value.toLowerCase())) {
-      createCard(src);
+      addImage(src);
     }
   });
 
   try {
     const snap = await db.collection("wallpapers").get();
-    snap.forEach(doc => createCard(doc.data().url));
+    snap.forEach(doc => addImage(doc.data().url));
   } catch(e){}
 }
 
-// CREATE CARD
-function createCard(src) {
-  const div = document.createElement("div");
-  div.className = "card";
+// ADD IMAGE SAFELY
+function addImage(src) {
+  const img = document.createElement("img");
 
-  div.innerHTML = `<img src="${src}" onclick="openModal('${src}')">`;
+  img.src = src;
 
-  gallery.appendChild(div);
+  // fallback if image fails
+  img.onerror = () => {
+    img.src = "https://via.placeholder.com/300x400?text=Image+Not+Found";
+  };
+
+  img.onclick = () => openModal(src);
+
+  gallery.appendChild(img);
 }
 
 // SEARCH
@@ -192,11 +183,10 @@ function login() {
       if (user.user.email === OWNER_EMAIL) {
         showUpload();
       }
-    })
-    .catch(err => alert(err.message));
+    });
 }
 
-// SHOW UPLOAD
+// UPLOAD
 function showUpload() {
   const btn = document.createElement("button");
   btn.innerText = "Upload";
@@ -204,7 +194,6 @@ function showUpload() {
   document.body.prepend(btn);
 }
 
-// UPLOAD
 function uploadWallpaper() {
   const input = document.createElement("input");
   input.type = "file";
@@ -222,12 +211,9 @@ function uploadWallpaper() {
   input.click();
 }
 
-// MODAL + DOWNLOAD FIX
+// MODAL
 const modal = document.getElementById("modal");
 const modalImg = document.getElementById("modalImg");
-const downloadBtn = document.getElementById("downloadBtn");
-
-let currentImage = "";
 
 function openModal(src) {
   modal.style.display = "block";
@@ -235,33 +221,27 @@ function openModal(src) {
   currentImage = src;
 }
 
-downloadBtn.onclick = () => downloadImage(currentImage);
-
-// 🔥 FIXED DOWNLOAD FUNCTION
-async function downloadImage(url) {
-  try {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = url.split("/").pop().split("?")[0];
-
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(blobUrl);
-  } catch (e) {
-    alert("Download failed ❌");
-  }
-}
-
-// CLOSE MODAL
 document.getElementById("close").onclick = () => {
   modal.style.display = "none";
 };
+
+// DOWNLOAD FIX
+async function downloadImage() {
+  try {
+    const res = await fetch(currentImage);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wallpaper.jpg";
+    a.click();
+
+    URL.revokeObjectURL(url);
+  } catch {
+    alert("Download failed ❌");
+  }
+}
 
 // START
 loadWallpapers();
